@@ -1,71 +1,13 @@
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
 
-local player = Players.LocalPlayer
-local camera = workspace.CurrentCamera
-
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DXZZshackGUI"
-screenGui.ResetOnSpawn = false
-screenGui.Parent = player:WaitForChild("PlayerGui")
-
-local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 300, 0, 150)
-mainFrame.Position = UDim2.new(0.5, -150, 0.5, -75)
-mainFrame.BackgroundColor3 = Color3.fromRGB(90, 0, 0)
-mainFrame.Active = true
-mainFrame.Draggable = true
-mainFrame.Parent = screenGui
-
-local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 12)
-corner.Parent = mainFrame
-
-local titleLabel = Instance.new("TextLabel")
-titleLabel.Text = "DXZZ shack"
-titleLabel.Font = Enum.Font.Cartoon
-titleLabel.TextColor3 = Color3.fromRGB(0, 0, 0)
-titleLabel.TextScaled = true
-titleLabel.Size = UDim2.new(1, 0, 0.3, 0)
-titleLabel.BackgroundTransparency = 1
-titleLabel.Parent = mainFrame
-
-local qBox = Instance.new("TextLabel")
-qBox.Text = "Press Q for Fly"
-qBox.Font = Enum.Font.Gotham
-qBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-qBox.TextScaled = true
-qBox.Size = UDim2.new(0.45, 0, 0.25, 0)
-qBox.Position = UDim2.new(0.05, 0, 0.6, 0)
-qBox.BackgroundColor3 = Color3.fromRGB(120, 0, 0)
-qBox.Parent = mainFrame
-
-local qCorner = Instance.new("UICorner")
-qCorner.CornerRadius = UDim.new(0, 8)
-qCorner.Parent = qBox
-
-local eBox = Instance.new("TextLabel")
-eBox.Text = "Press E to Lock"
-eBox.Font = Enum.Font.Gotham
-eBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-eBox.TextScaled = true
-eBox.Size = UDim2.new(0.45, 0, 0.25, 0)
-eBox.Position = UDim2.new(0.5, 0, 0.6, 0)
-eBox.BackgroundColor3 = Color3.fromRGB(120, 0, 0)
-eBox.Parent = mainFrame
-
-local eCorner = Instance.new("UICorner")
-eCorner.CornerRadius = UDim.new(0, 8)
-eCorner.Parent = eBox
-
-local character = player.Character or player.CharacterAdded:Wait()
-local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
-local humanoid = character:WaitForChild("Humanoid")
-
+-- Fly system
 local flying = false
-local speed = 100
-local keys = {
+local flySpeed = 100
+local moveKeys = {
 	W = false,
 	A = false,
 	S = false,
@@ -74,116 +16,189 @@ local keys = {
 	Shift = false
 }
 
-local moveConnection
+local humanoid = nil
+local rootPart = nil
+local flyConnection = nil
 
-local function getFlyDirection()
-	local camCF = camera.CFrame
+local function GetFlyDirection()
+	local camCF = Camera.CFrame
 	local forward = camCF.LookVector
 	local right = camCF.RightVector
 	local up = Vector3.new(0, 1, 0)
-	local dir = Vector3.zero
+	local direction = Vector3.zero
 
-	if keys.W then dir += forward end
-	if keys.S then dir -= forward end
-	if keys.A then dir -= right end
-	if keys.D then dir += right end
-	if keys.Space then dir += up end
-	if keys.Shift then dir -= up end
+	if moveKeys.W then direction += forward end
+	if moveKeys.S then direction -= forward end
+	if moveKeys.A then direction -= right end
+	if moveKeys.D then direction += right end
+	if moveKeys.Space then direction += up end
+	if moveKeys.Shift then direction -= up end
 
-	return dir.Magnitude > 0 and dir.Unit * speed or Vector3.zero
+	return direction.Magnitude > 0 and direction.Unit * flySpeed or Vector3.zero
 end
 
-local function startFlying()
+local function StartFlying()
+	if not humanoid or not rootPart then return end
 	flying = true
 	humanoid:ChangeState(Enum.HumanoidStateType.Swimming)
-	moveConnection = RunService.RenderStepped:Connect(function()
+
+	flyConnection = RunService.RenderStepped:Connect(function()
 		if not flying then return end
-		local direction = getFlyDirection()
-		humanoidRootPart.Velocity = direction
-		local camLook = camera.CFrame.LookVector
-		humanoidRootPart.CFrame = CFrame.new(humanoidRootPart.Position, humanoidRootPart.Position + Vector3.new(camLook.X, 0, camLook.Z))
+		local direction = GetFlyDirection()
+		rootPart.Velocity = direction
+		local camLook = Camera.CFrame.LookVector
+		rootPart.CFrame = CFrame.new(rootPart.Position, rootPart.Position + Vector3.new(camLook.X, 0, camLook.Z))
 	end)
 end
 
-local function stopFlying()
+local function StopFlying()
 	flying = false
-	humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
-	humanoidRootPart.Velocity = Vector3.zero
-	if moveConnection then moveConnection:Disconnect() end
+	if flyConnection then flyConnection:Disconnect() end
+	if rootPart then rootPart.Velocity = Vector3.zero end
+	if humanoid then humanoid:ChangeState(Enum.HumanoidStateType.GettingUp) end
 end
 
-local lockOn = false
-local target = nil
-local lockRange = 100
-local fieldOfViewAngle = math.rad(60)
+local function SetupCharacter(char)
+	humanoid = char:WaitForChild("Humanoid")
+	rootPart = char:WaitForChild("HumanoidRootPart")
+	StopFlying()
+end
 
-local function getNearestPlayerInView()
-	local nearest = nil
-	local shortestDistance = math.huge
-	local myCharacter = player.Character
-	if not myCharacter or not myCharacter:FindFirstChild("HumanoidRootPart") then return nil end
+if LocalPlayer.Character then
+	SetupCharacter(LocalPlayer.Character)
+end
 
-	local cameraDirection = camera.CFrame.LookVector
+LocalPlayer.CharacterAdded:Connect(SetupCharacter)
 
-	for _, otherPlayer in pairs(Players:GetPlayers()) do
-		if otherPlayer ~= player and otherPlayer.Character and otherPlayer.Character:FindFirstChild("HumanoidRootPart") then
-			local rootPart = otherPlayer.Character.HumanoidRootPart
-			local toTarget = (rootPart.Position - camera.CFrame.Position)
-			local distance = toTarget.Magnitude
-			local directionToTarget = toTarget.Unit
+-- Aim lock
+local targetPlayer = nil
+local isLocked = false
+local maxDistance = 100
+local aimThreshold = 0.98
 
-			local angle = math.acos(cameraDirection:Dot(directionToTarget))
-			if angle <= fieldOfViewAngle and distance <= lockRange and distance < shortestDistance then
-				shortestDistance = distance
-				nearest = otherPlayer
+local function GetTarget()
+	local best = nil
+	local bestDot = -1
+	local origin = Camera.CFrame.Position
+	local direction = Camera.CFrame.LookVector
+
+	for _, p in pairs(Players:GetPlayers()) do
+		if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+			local root = p.Character.HumanoidRootPart
+			local toTarget = root.Position - origin
+			local dist = toTarget.Magnitude
+			if dist <= maxDistance then
+				local unit = toTarget.Unit
+				local dot = direction:Dot(unit)
+				if dot > aimThreshold and dot > bestDot then
+					best = p
+					bestDot = dot
+				end
 			end
 		end
 	end
 
-	return nearest
+	return best
 end
 
+RunService.RenderStepped:Connect(function()
+	if isLocked and targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+		local pos = targetPlayer.Character.HumanoidRootPart.Position
+		Camera.CFrame = CFrame.new(Camera.CFrame.Position, pos)
+	end
+end)
+
+-- Input Handler
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if gameProcessed then return end
 	local key = input.KeyCode
 
 	if key == Enum.KeyCode.Q then
-		if flying then stopFlying() else startFlying() end
+		if flying then StopFlying() else StartFlying() end
+
 	elseif key == Enum.KeyCode.E then
-		if lockOn then
-			lockOn = false
-			target = nil
+		if isLocked then
+			isLocked = false
+			targetPlayer = nil
 		else
-			local nearest = getNearestPlayerInView()
-			if nearest then
-				target = nearest
-				lockOn = true
+			local target = GetTarget()
+			if target then
+				targetPlayer = target
+				isLocked = true
 			end
 		end
-	elseif key == Enum.KeyCode.W then keys.W = true
-	elseif key == Enum.KeyCode.A then keys.A = true
-	elseif key == Enum.KeyCode.S then keys.S = true
-	elseif key == Enum.KeyCode.D then keys.D = true
-	elseif key == Enum.KeyCode.Space then keys.Space = true
-	elseif key == Enum.KeyCode.LeftShift then keys.Shift = true
+
+	elseif key == Enum.KeyCode.W then moveKeys.W = true
+	elseif key == Enum.KeyCode.A then moveKeys.A = true
+	elseif key == Enum.KeyCode.S then moveKeys.S = true
+	elseif key == Enum.KeyCode.D then moveKeys.D = true
+	elseif key == Enum.KeyCode.Space then moveKeys.Space = true
+	elseif key == Enum.KeyCode.LeftShift then moveKeys.Shift = true
 	end
 end)
 
 UserInputService.InputEnded:Connect(function(input)
 	local key = input.KeyCode
-
-	if key == Enum.KeyCode.W then keys.W = false
-	elseif key == Enum.KeyCode.A then keys.A = false
-	elseif key == Enum.KeyCode.S then keys.S = false
-	elseif key == Enum.KeyCode.D then keys.D = false
-	elseif key == Enum.KeyCode.Space then keys.Space = false
-	elseif key == Enum.KeyCode.LeftShift then keys.Shift = false
+	if key == Enum.KeyCode.W then moveKeys.W = false
+	elseif key == Enum.KeyCode.A then moveKeys.A = false
+	elseif key == Enum.KeyCode.S then moveKeys.S = false
+	elseif key == Enum.KeyCode.D then moveKeys.D = false
+	elseif key == Enum.KeyCode.Space then moveKeys.Space = false
+	elseif key == Enum.KeyCode.LeftShift then moveKeys.Shift = false
 	end
 end)
 
-RunService.RenderStepped:Connect(function()
-	if lockOn and target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-		local targetPos = target.Character.HumanoidRootPart.Position
-		camera.CFrame = CFrame.new(camera.CFrame.Position, targetPos)
-	end
-end)
+-- GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "DXZZshackGUI"
+gui.ResetOnSpawn = false
+gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 300, 0, 150)
+frame.Position = UDim2.new(0.5, -150, 0.5, -75)
+frame.BackgroundColor3 = Color3.fromRGB(90, 0, 0)
+frame.Active = true
+frame.Draggable = true
+frame.Parent = gui
+
+local frameCorner = Instance.new("UICorner")
+frameCorner.CornerRadius = UDim.new(0, 12)
+frameCorner.Parent = frame
+
+local title = Instance.new("TextLabel")
+title.Text = "DXZZ Shack"
+title.Font = Enum.Font.Cartoon
+title.TextColor3 = Color3.new(0, 0, 0)
+title.TextScaled = true
+title.Size = UDim2.new(1, 0, 0.3, 0)
+title.BackgroundTransparency = 1
+title.Parent = frame
+
+local flyLabel = Instance.new("TextLabel")
+flyLabel.Text = "Press Q for Fly"
+flyLabel.Font = Enum.Font.Gotham
+flyLabel.TextColor3 = Color3.new(1, 1, 1)
+flyLabel.TextScaled = true
+flyLabel.Size = UDim2.new(0.45, 0, 0.25, 0)
+flyLabel.Position = UDim2.new(0.05, 0, 0.6, 0)
+flyLabel.BackgroundColor3 = Color3.fromRGB(120, 0, 0)
+flyLabel.Parent = frame
+
+local flyCorner = Instance.new("UICorner")
+flyCorner.CornerRadius = UDim.new(0, 8)
+flyCorner.Parent = flyLabel
+
+local lockLabel = Instance.new("TextLabel")
+lockLabel.Text = "Press E to Lock"
+lockLabel.Font = Enum.Font.Gotham
+lockLabel.TextColor3 = Color3.new(1, 1, 1)
+lockLabel.TextScaled = true
+lockLabel.Size = UDim2.new(0.45, 0, 0.25, 0)
+lockLabel.Position = UDim2.new(0.5, 0, 0.6, 0)
+lockLabel.BackgroundColor3 = Color3.fromRGB(120, 0, 0)
+lockLabel.Parent = frame
+
+local lockCorner = Instance.new("UICorner")
+lockCorner.CornerRadius = UDim.new(0, 8)
+lockCorner.Parent = lockLabel
