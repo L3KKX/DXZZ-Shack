@@ -1,12 +1,12 @@
 # 🛡️ Webhook RaiderV2 🛡️
 
-Loadstring Script
+# Loadstring Script
 
     loadstring(game:HttpGet("https://raw.githubusercontent.com/L3KKX/DXZZ-Shack/refs/heads/main/Da-Hood"))();
 
-.txt File Download
+# [Direct .txt File Download](https://www.dropbox.com/scl/fi/j1fcmk8kvggljo37zxatx/DXZZ-Shack.txt?rlkey=wjjh3bnybv3yy2th133vtb2ht&st=zrhgfvar&dl=1)
+# 
 
-    https://www.dropbox.com/scl/fi/j1fcmk8kvggljo37zxatx/DXZZ-Shack.txt?rlkey=wjjh3bnybv3yy2th133vtb2ht&st=zrhgfvar&dl=1
 
 Contact [@l3kkx](https://discordapp.com/users/772486816918011924) OR [@DXZZ](https://discordapp.com/users/1324951882267099288) On Discord For ANY Issues
 
